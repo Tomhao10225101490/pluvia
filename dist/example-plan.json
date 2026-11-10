@@ -1,0 +1,152 @@
+{
+  "version": 1,
+  "seed": 7,
+  "budget": 180000,
+  "config": {
+    "name": "Summer cloudburst",
+    "intensity": 90,
+    "duration": 60,
+    "shape": "pulse",
+    "soilFactor": 1
+  },
+  "scenario": "cloudburst",
+  "plan": [
+    {
+      "i": 1081,
+      "kind": "pavement"
+    },
+    {
+      "i": 1272,
+      "kind": "pavement"
+    },
+    {
+      "i": 1076,
+      "kind": "pavement"
+    },
+    {
+      "i": 1077,
+      "kind": "pavement"
+    },
+    {
+      "i": 987,
+      "kind": "pavement"
+    },
+    {
+      "i": 981,
+      "kind": "pavement"
+    },
+    {
+      "i": 938,
+      "kind": "pavement"
+    },
+    {
+      "i": 1028,
+      "kind": "pavement"
+    },
+    {
+      "i": 1075,
+      "kind": "pavement"
+    },
+    {
+      "i": 1085,
+      "kind": "pavement"
+    },
+    {
+      "i": 980,
+      "kind": "pavement"
+    },
+    {
+      "i": 1228,
+      "kind": "garden"
+    },
+    {
+      "i": 1126,
+      "kind": "basin"
+    },
+    {
+      "i": 1079,
+      "kind": "pavement"
+    },
+    {
+      "i": 1030,
+      "kind": "pavement"
+    },
+    {
+      "i": 1078,
+      "kind": "pavement"
+    },
+    {
+      "i": 1273,
+      "kind": "pavement"
+    },
+    {
+      "i": 1322,
+      "kind": "pavement"
+    },
+    {
+      "i": 1036,
+      "kind": "pavement"
+    },
+    {
+      "i": 1224,
+      "kind": "pavement"
+    },
+    {
+      "i": 1130,
+      "kind": "pavement"
+    },
+    {
+      "i": 1128,
+      "kind": "pavement"
+    },
+    {
+      "i": 1083,
+      "kind": "pavement"
+    },
+    {
+      "i": 1275,
+      "kind": "garden"
+    },
+    {
+      "i": 1029,
+      "kind": "pavement"
+    },
+    {
+      "i": 1084,
+      "kind": "pavement"
+    },
+    {
+      "i": 588,
+      "kind": "pavement"
+    },
+    {
+      "i": 1027,
+      "kind": "pavement"
+    },
+    {
+      "i": 1125,
+      "kind": "garden"
+    },
+    {
+      "i": 1177,
+      "kind": "pavement"
+    },
+    {
+      "i": 1127,
+      "kind": "basin"
+    },
+    {
+      "i": 637,
+      "kind": "pavement"
+    },
+    {
+      "i": 1026,
+      "kind": "pavement"
+    },
+    {
+      "i": 734,
+      "kind": "pavement"
+    }
+  ],
+  "elevation": null
+}

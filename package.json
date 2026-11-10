@@ -1,0 +1,8 @@
+{
+  "name": "pluvia",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "A browser-native urban stormwater design laboratory",
+  "scripts": {"test": "node --test tests/*.test.js", "dev": "python3 -m http.server 8791 --directory dist", "check": "node --check dist/engine.js && node --check dist/app.js && node --check dist/worker.js"}
+}

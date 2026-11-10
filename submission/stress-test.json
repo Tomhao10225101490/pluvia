@@ -1,0 +1,249 @@
+{
+  "plan": {
+    "version": 1,
+    "seed": 7,
+    "budget": 180000,
+    "config": {
+      "name": "Summer cloudburst",
+      "intensity": 90,
+      "duration": 60,
+      "shape": "pulse",
+      "soilFactor": 1
+    },
+    "scenario": "cloudburst",
+    "plan": [
+      {
+        "i": 1081,
+        "kind": "pavement"
+      },
+      {
+        "i": 1272,
+        "kind": "pavement"
+      },
+      {
+        "i": 1076,
+        "kind": "pavement"
+      },
+      {
+        "i": 1077,
+        "kind": "pavement"
+      },
+      {
+        "i": 987,
+        "kind": "pavement"
+      },
+      {
+        "i": 981,
+        "kind": "pavement"
+      },
+      {
+        "i": 938,
+        "kind": "pavement"
+      },
+      {
+        "i": 1028,
+        "kind": "pavement"
+      },
+      {
+        "i": 1075,
+        "kind": "pavement"
+      },
+      {
+        "i": 1085,
+        "kind": "pavement"
+      },
+      {
+        "i": 980,
+        "kind": "pavement"
+      },
+      {
+        "i": 1228,
+        "kind": "garden"
+      },
+      {
+        "i": 1126,
+        "kind": "basin"
+      },
+      {
+        "i": 1079,
+        "kind": "pavement"
+      },
+      {
+        "i": 1030,
+        "kind": "pavement"
+      },
+      {
+        "i": 1078,
+        "kind": "pavement"
+      },
+      {
+        "i": 1273,
+        "kind": "pavement"
+      },
+      {
+        "i": 1322,
+        "kind": "pavement"
+      },
+      {
+        "i": 1036,
+        "kind": "pavement"
+      },
+      {
+        "i": 1224,
+        "kind": "pavement"
+      },
+      {
+        "i": 1130,
+        "kind": "pavement"
+      },
+      {
+        "i": 1128,
+        "kind": "pavement"
+      },
+      {
+        "i": 1083,
+        "kind": "pavement"
+      },
+      {
+        "i": 1275,
+        "kind": "garden"
+      },
+      {
+        "i": 1029,
+        "kind": "pavement"
+      },
+      {
+        "i": 1084,
+        "kind": "pavement"
+      },
+      {
+        "i": 588,
+        "kind": "pavement"
+      },
+      {
+        "i": 1027,
+        "kind": "pavement"
+      },
+      {
+        "i": 1125,
+        "kind": "garden"
+      },
+      {
+        "i": 1177,
+        "kind": "pavement"
+      },
+      {
+        "i": 1127,
+        "kind": "basin"
+      },
+      {
+        "i": 637,
+        "kind": "pavement"
+      },
+      {
+        "i": 1026,
+        "kind": "pavement"
+      },
+      {
+        "i": 734,
+        "kind": "pavement"
+      }
+    ],
+    "elevation": null
+  },
+  "tests": [
+    {
+      "name": "Summer cloudburst",
+      "intensity": 90,
+      "duration": 60,
+      "b": {
+        "rain": 11059.199999999997,
+        "infiltrated": 483.43680000343545,
+        "drained": 2625.1381716492515,
+        "stored": 0,
+        "surface": 7950.62502835056,
+        "peakArea": 28736,
+        "peakVolume": 7950.62502835056,
+        "peakAt": 60,
+        "maxDepth": 0.3481727940734613,
+        "balance": -3.2496245694346726e-9,
+        "cost": 0
+      },
+      "d": {
+        "rain": 11059.199999999997,
+        "infiltrated": 597.9596659779975,
+        "drained": 2617.3178193320164,
+        "stored": 231.99999999999994,
+        "surface": 7611.922514691155,
+        "peakArea": 27584,
+        "peakVolume": 7611.922514691155,
+        "peakAt": 60,
+        "maxDepth": 0.3308884514352631,
+        "balance": -1.1714291758835316e-9,
+        "cost": 176500
+      }
+    },
+    {
+      "name": "Long monsoon",
+      "intensity": 45,
+      "duration": 120,
+      "b": {
+        "rain": 11059.200000000032,
+        "infiltrated": 966.8735999920675,
+        "drained": 3321.74522595668,
+        "stored": 0,
+        "surface": 6770.58117403997,
+        "peakArea": 23808,
+        "peakVolume": 6770.58117403997,
+        "peakAt": 120,
+        "maxDepth": 0.3827913628667823,
+        "balance": 1.1314114090055227e-8,
+        "cost": 0
+      },
+      "d": {
+        "rain": 11059.200000000032,
+        "infiltrated": 1199.3600763528273,
+        "drained": 3263.836382655205,
+        "stored": 231.99999999999994,
+        "surface": 6364.003540979543,
+        "peakArea": 22720,
+        "peakVolume": 6364.003540979543,
+        "peakAt": 120,
+        "maxDepth": 0.36634043700533336,
+        "balance": 1.2456439435482025e-8,
+        "cost": 176500
+      }
+    },
+    {
+      "name": "Extreme downpour",
+      "intensity": 135,
+      "duration": 60,
+      "b": {
+        "rain": 16588.8,
+        "infiltrated": 483.43680000343545,
+        "drained": 3795.1965989205055,
+        "stored": 0,
+        "surface": 12310.16660107927,
+        "peakArea": 49152,
+        "peakVolume": 12310.16660107927,
+        "peakAt": 60,
+        "maxDepth": 0.4111271386172224,
+        "balance": -3.2123352866619825e-9,
+        "cost": 0
+      },
+      "d": {
+        "rain": 16588.8,
+        "infiltrated": 599.826061302737,
+        "drained": 3786.617393272772,
+        "stored": 231.99999999999994,
+        "surface": 11970.35654542562,
+        "peakArea": 48256,
+        "peakVolume": 11970.35654542562,
+        "peakAt": 60,
+        "maxDepth": 0.3951746788779366,
+        "balance": -1.1300471669528633e-9,
+        "cost": 176500
+      }
+    }
+  ]
+}
