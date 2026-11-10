@@ -23,7 +23,7 @@ export function exportCover(state){drawCover(state).toBlob(blob=>save(blob,'pluv
 export async function recordDemo(state,frame,onProgress){
   if(!window.MediaRecorder)throw Error('Video recording is not supported in this browser.');
   const audioCtx=new AudioContext();await audioCtx.resume();
-  const audio=await audioCtx.decodeAudioData(await (await fetch('./narration.wav')).arrayBuffer());
+  const audio=await audioCtx.decodeAudioData(await (await fetch('./narration.m4a')).arrayBuffer());
   const out=document.createElement('canvas');out.width=1600;out.height=900;const c=out.getContext('2d');
   const destination=audioCtx.createMediaStreamDestination(),voice=audioCtx.createBufferSource();voice.buffer=audio;voice.connect(destination);voice.connect(audioCtx.destination);
   const stream=out.captureStream(30);destination.stream.getAudioTracks().forEach(t=>stream.addTrack(t));
