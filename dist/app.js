@@ -6,7 +6,7 @@ const money=v=>'$'+fmt(v),clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 let seed=7,city=createCity(seed),plan=[],history=[],budget=180000,config={...SCENARIOS.cloudburst,soilFactor:1},scenario='cloudburst';
 let results=null,worker=null,busy=false,tool='inspect',layer='water',minute=40,playing=false,speed=1,showRoute=false,hover=-1,selected=-1,zoom=1,frontier=[],elevation=null;
-let width=0,height=0,scale=1,ox=0,oy=0,lastTick=0,lastDraw=0,dirty=true,toastTimer,presentationBaseline=false;
+let width=0,height=0,scale=1,ox=0,oy=0,lastTick=0,lastDraw=0,dirty=true,toastTimer,presentationBaseline=false,city3d=null,cameraMode='2d',autoOrbit=false,recording=false,jobSerial=0,mainJob=0,displayDatum=0;
 const canvas=$('cityCanvas'),ctx=canvas.getContext('2d'),chart=$('hydrograph'),cx=chart.getContext('2d'),reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const storage={get(){try{return JSON.parse(localStorage.getItem('pluvia-v1'));}catch{return null;}},set(v){try{localStorage.setItem('pluvia-v1',JSON.stringify(v));}catch{}}};
 const snapshot=()=>({version:1,seed,budget,config,scenario,plan,elevation});
@@ -14,9 +14,10 @@ function toast(message){$('toast').textContent=message;$('toast').classList.add(
 function modal(html){$('modalContent').innerHTML=html;$('modal').showModal();}
 function setBusy(value,title='Following every drop…',detail='Running paired simulations'){
   busy=value;$('busy').hidden=!value;$('busyText').textContent=title;$('busyDetail').textContent=detail;
-  for(const id of ['optimizeBtn','runBtn','stressBtn','newMapBtn','undoBtn','clearBtn','importBtn','budget','rainfall','duration','soil','scenario'])$(id).disabled=value;
+  for(const id of ['optimizeBtn','runBtn','stressBtn','newMapBtn','undoBtn','clearBtn','importBtn','budget','rainfall','duration','soil','scenario','exampleBtn','elevationBtn','elevationFile','importFile','reportBtn'])if($(id))$(id).disabled=value;
 }
 function makeWorker(){if(worker)worker.terminate();worker=new Worker('./worker.js',{type:'module'});worker.onerror=()=>{setBusy(false);toast('The background engine could not start. Reload to retry.');};worker.onmessage=({data})=>{
+  if(data.jobId!==mainJob)return;
   if(data.type==='progress'){$('busyDetail').textContent=`${data.evaluated} full simulations · ${data.round} improvements · ${money(data.cost)}`;$('optimizerNote').textContent=`Testing interventions: ${data.evaluated} simulations evaluated`;return;}
   if(data.type==='error'){setBusy(false);toast(data.message);return;}
   if(data.type==='optimized'){
@@ -26,8 +27,8 @@ function makeWorker(){if(worker)worker.terminate();worker=new Worker('./worker.j
   }
   if(data.type==='simulation'){results={baseline:data.baseline,design:data.design};setBusy(false);$('timeline').max=config.duration;minute=clamp(minute,0,config.duration);update();renderCompare();dirty=true;}
 };}
-function payload(action){return {action,seed,relief:1,plan,config,budget,elevation};}
-function run(){playing=false;$('playBtn').textContent='▶';setBusy(true);worker.postMessage(payload('simulate'));storage.set(snapshot());}
+function payload(action){return {action,seed,relief:1,plan,config,budget,elevation,jobId:++jobSerial};}
+function run(){playing=false;$('playBtn').textContent='▶';setBusy(true);const message=payload('simulate');mainJob=message.jobId;worker.postMessage(message);storage.set(snapshot());}
 function updateBudget(){const spent=costOf(plan);$('budgetValue').textContent=money(budget);$('spentValue').textContent=money(spent);$('budgetFill').style.width=`${spent/budget*100}%`;$('tileCount').textContent=`${plan.length} intervention${plan.length!==1?'s':''}`;$('mapPlanLabel').textContent=plan.length?`${plan.length} interventions`:'Baseline city';}
 function currentFrame(which='design'){if(presentationBaseline&&which==='design')which='baseline';return results?.[which].frames[Math.min(Math.round(minute),results[which].frames.length-1)]??new Float32Array(N);}
 function update(){
@@ -45,7 +46,7 @@ function update(){
   const r=route(city,currentFrame());$('routeStatus').textContent=r.path.length?`${fmt(r.length)} m · route available`:'No route below 15 cm';$('routeDetail').textContent=`At minute ${fmt(minute)} · school → community center`;
   dirty=true;drawChart();
 }
-function chooseTool(value){tool=value;$$('[data-tool]').forEach(b=>b.classList.toggle('selected',b.dataset.tool===value));$('eraseBtn').style.color=value==='erase'?'var(--green)':'';$('mapHint').textContent=value==='inspect'?'⌖ Click any tile to explore · Scroll to zoom':value==='erase'?'Click an intervention to remove it':`${KIT[value].name}: click a compatible tile · Esc to inspect`;dirty=true;}
+function chooseTool(value){tool=value;$$('[data-tool]').forEach(b=>b.classList.toggle('selected',b.dataset.tool===value));$('eraseBtn').style.color=value==='erase'?'var(--green)':'';$('mapHint').textContent=value==='inspect'?(cameraMode==='3d'?'Drag to orbit · Right-drag to pan · Click a tile':'⌖ Click any tile to explore · Scroll to zoom'):value==='erase'?'Click an intervention to remove it':`${KIT[value].name}: click a compatible tile · Esc to inspect`;dirty=true;}
 function editAt(i){
   if(busy||i<0||i>=N)return;
   if(tool==='inspect'){selected=i;showInspector(i);dirty=true;return;}
@@ -60,11 +61,11 @@ function editAt(i){
 }
 function showInspector(i){
   const el=$('inspector');if(i<0){el.hidden=true;return;}
-  const names=['Open ground','Street','Building rooftop','Parkland','River outlet'],p=plan.find(p=>p.i===i),point=project(i%W+.5,Math.floor(i/W)+.5,city.z[i]);
+  const names=['Open ground','Street','Building rooftop','Parkland','River outlet'],p=plan.find(p=>p.i===i),point=cameraMode==='3d'&&city3d?city3d.projectCell(i):project(i%W+.5,Math.floor(i/W)+.5,city.z[i]);
   el.hidden=false;el.style.left=clamp(point[0]+16,8,width-190)+'px';el.style.top=clamp(point[1]-50,55,height-130)+'px';
   el.innerHTML=`<b>${p?KIT[p.kind].name:names[city.type[i]]}</b><span>Cell ${i%W+1}, ${Math.floor(i/W)+1} · 64 m²</span><br>Elevation <strong>${fmt(city.z[i],2)} m</strong><br>Water depth <strong>${fmt(currentFrame()[i]*100,1)} cm</strong>${p?`<br>Storage capacity <strong>${fmt(KIT[p.kind].capacity*AREA,1)} m³</strong>`:''}`;
 }
-function project(x,y,z=0){return [ox+(x-y)*scale,oy+(x+y)*scale*.48-z*scale*1.5];}
+function project(x,y,z=0){return [ox+(x-y)*scale,oy+(x+y)*scale*.48-(z-displayDatum)*scale*1.5];}
 function polygon(points,fill,stroke=null,lw=.5){ctx.beginPath();points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath();if(fill){ctx.fillStyle=fill;ctx.fill();}if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=lw;ctx.stroke();}}
 function diamond(x,y,sx=1,sy=1,z=0){return [project(x,y,z),project(x+sx,y,z),project(x+sx,y+sy,z),project(x,y+sy,z)];}
 function drawBuilding(b){
@@ -91,6 +92,10 @@ function tree(x,y,variation=0){
 }
 function drawMap(now=0){
   if(!width)return;
+  if(cameraMode==='3d'&&city3d){
+    city3d.update({city,plan,depth:currentFrame(),layer,route:showRoute?route(city,currentFrame()).path:[],hover,selected,baseline:presentationBaseline});city3d.render(now);dirty=false;return;
+  }
+  displayDatum=Math.min(...city.z);
   const dpr=Math.min(devicePixelRatio||1,2);ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,width,height);
   const total=W+H;scale=Math.min(width/(total+8),height/(total*.48+18))*zoom;ox=width/2-(W-H)*scale/2;oy=(height-total*scale*.48)/2+scale*1.4;
   // Soft site shadow and the cut edge of the terrain block.
@@ -142,32 +147,32 @@ function drawChart(){
   cx.textAlign='center';cx.fillStyle='#929e87';for(let t=0;t<=config.duration;t+=config.duration/4)cx.fillText(fmt(t),X(t),h-3);
   cx.strokeStyle='#b7c5ab';cx.lineWidth=.6;cx.beginPath();cx.moveTo(X(minute),pad.t);cx.lineTo(X(minute),h-pad.b);cx.stroke();const p=d[Math.min(Math.round(minute),d.length-1)];cx.fillStyle='#297963';cx.beginPath();cx.arc(X(minute),Y(p.surface),3,0,Math.PI*2);cx.fill();
 }
-function resize(){const r=$('stage').getBoundingClientRect();width=r.width;height=r.height;const dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);dirty=true;drawChart();}
+function resize(){const r=$('stage').getBoundingClientRect();width=r.width;height=r.height;const dpr=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);if(city3d)city3d.resize(width,height);dirty=true;drawChart();}
 function hit(event){const r=canvas.getBoundingClientRect(),sx=event.clientX-r.left,sy=event.clientY-r.top;let localY=(sy-oy)/(.48*scale),localX=(sx-ox)/scale;let x=Math.floor((localY+localX)/2),y=Math.floor((localY-localX)/2);for(let k=0;k<2;k++){const i=clamp(y,0,H-1)*W+clamp(x,0,W-1);localY=(sy-oy+city.z[i]*scale*1.5)/(.48*scale);x=Math.floor((localY+localX)/2);y=Math.floor((localY-localX)/2);}return x<0||x>=W||y<0||y>=H?-1:y*W+x;}
-function switchView(value){$$('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===value));$('designView').hidden=value!=='design';$('compareView').hidden=value!=='compare';$('methodView').hidden=value!=='method';if(value==='design'){resize();update();}if(value==='compare')renderCompare();}
+function switchView(value){if(recording)return;$$('[data-view]').forEach(b=>b.classList.toggle('active',b.dataset.view===value));$('designView').hidden=value!=='design';$('compareView').hidden=value!=='compare';$('methodView').hidden=value!=='method';if(value==='design'){resize();update();}if(value==='compare')renderCompare();}
 function card(title,result,featured=false){const m=result.metrics;return `<article class="compare-card ${featured?'featured':''}"><div class="eyebrow">${featured?'THE NEIGHBORHOOD YOU DESIGNED':'THE REFERENCE SCENARIO'}</div><h3>${title}</h3><div class="big">${fmt(m.peakVolume)} <small>m³ peak water</small></div><p>${featured?`${plan.length} interventions · ${money(costOf(plan))} allocated`:'Existing surfaces · no new investment'}</p><dl><div><dt>Peak area above 10 cm</dt><dd>${fmt(m.peakArea)} m²</dd></div><div><dt>Infiltrated + retained</dt><dd>${fmt(m.infiltrated+m.stored)} m³</dd></div><div><dt>Outflow</dt><dd>${fmt(m.drained)} m³</dd></div><div><dt>Water balance residual</dt><dd>${Math.abs(m.balance).toExponential(1)} m³</dd></div></dl></article>`;}
 function renderCompare(){if(!results)return;const b=results.baseline,d=results.design,gain=b.metrics.peakVolume-d.metrics.peakVolume;
   $('compareContent').innerHTML=`<div class="compare-grid">${card('Before the intervention',b)}${card('A little more resilient',d,true)}<article class="compare-card"><div class="eyebrow">WHAT YOUR INVESTMENT CHANGES</div><h3>The difference</h3><div class="big">${fmt(b.metrics.peakVolume?gain/b.metrics.peakVolume*100:0,1)}<small>% less peak water</small></div><p>${fmt(gain)} m³ reduction at the surface peak. ${fmt(costOf(plan)/(gain||1))} illustrative dollars per m³ of peak reduction.</p><dl><div><dt>Storm intensity</dt><dd>${config.intensity} mm/h</dd></div><div><dt>Duration</dt><dd>${config.duration} min</dd></div><div><dt>Total rainfall volume</dt><dd>${fmt(d.metrics.rain)} m³</dd></div><div><dt>Budget remaining</dt><dd>${money(budget-costOf(plan))}</dd></div></dl></article></div><div class="compare-chart"><h3>There is more than one better plan.</h3><p>${frontier.length?'Every point below is an accepted step from the latest optimizer run. Click one to restore that budget / performance tradeoff.':'Run “Find a better plan” in the design lab to explore an investment / performance frontier. Each accepted improvement is a fully simulated plan.'}</p><div class="frontier-list">${frontier.map((p,i)=>`<button class="frontier-item" data-frontier="${i}"><span>${money(p.cost)}</span><strong>${fmt(p.volume)} m³</strong><span>${p.plan.length} interventions</span></button>`).join('')}</div></div>`;
-  $$('[data-frontier]').forEach(b=>b.onclick=()=>{history.push([...plan]);plan=frontier[+b.dataset.frontier].plan.map(p=>({...p}));switchView('design');run();toast('Restored this point on the investment frontier.');});
+  $$('[data-frontier]').forEach(b=>b.onclick=()=>{if(busy)return;history.push([...plan]);plan=frontier[+b.dataset.frontier].plan.map(p=>({...p}));switchView('design');run();toast('Restored this point on the investment frontier.');});
 }
 function validSnapshot(s){
   if(!s||s.version!==1||!Number.isInteger(s.seed)||s.seed<0||s.seed>1000000||!Number.isFinite(s.budget)||s.budget<0||s.budget>300000)throw Error('This is not a supported PLUVIA plan.');
   const c=s.config;if(!c||!Number.isFinite(c.intensity)||c.intensity<0||c.intensity>180||![30,60,120].includes(c.duration)||!['pulse','steady'].includes(c.shape)||![.45,1,1.5].includes(c.soilFactor??1))throw Error('This plan has invalid storm settings.');
   if(s.elevation&&(!Array.isArray(s.elevation)||s.elevation.length!==N||s.elevation.some(n=>!Number.isFinite(n)||Math.abs(n)>10000)))throw Error('The elevation grid is invalid.');
-  return {...s,plan:validatePlan(s.plan,createCity(s.seed),s.budget)};
+  return {...s,config:{intensity:c.intensity,duration:c.duration,shape:c.shape,soilFactor:c.soilFactor??1},plan:validatePlan(s.plan,createCity(s.seed),s.budget)};
 }
-function restore(s){s=validSnapshot(s);seed=s.seed;city=createCity(seed);plan=s.plan;budget=s.budget;config={...s.config,soilFactor:s.config.soilFactor??1};scenario=SCENARIOS[s.scenario]?s.scenario:'custom';elevation=s.elevation??null;if(elevation)city.z.set(elevation);$('scenario').value=scenario;$('rainfall').value=config.intensity;$('duration').value=config.duration;$('soil').value=config.soilFactor;$('budget').value=budget;history=[];updateBudget();}
+function restore(s){s=validSnapshot(s);seed=s.seed;city=createCity(seed);plan=s.plan;budget=s.budget;config={...s.config,soilFactor:s.config.soilFactor??1};scenario=Object.hasOwn(SCENARIOS,s.scenario)?s.scenario:'custom';elevation=s.elevation??null;if(elevation)city.z.set(elevation);$('scenario').value=scenario;$('rainfall').value=config.intensity;$('duration').value=config.duration;$('soil').value=config.soilFactor;$('budget').value=budget;history=[];updateBudget();}
 function download(name,content,mime='application/json'){const url=URL.createObjectURL(new Blob([content],{type:mime})),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);}
 function exportPlan(){download('pluvia-riverside-plan.json',JSON.stringify(snapshot(),null,2));toast('Plan exported. Import it to reproduce the same simulation.');}
 function ledger(){if(!results)return;const m=results.design.metrics;modal(`<div class="eyebrow">CONSERVATION, MADE VISIBLE</div><h2>Every drop has a destination.</h2><p>At the end of the storm, the rainfall input must equal all water remaining in the model plus all tracked sinks.</p><div class="ledger"><div><span>Rainfall input</span><strong>${fmt(m.rain,2)} m³</strong></div><div><span>Surface water remaining</span><strong>${fmt(m.surface,2)} m³</strong></div><div><span>Water in intervention storage</span><strong>${fmt(m.stored,2)} m³</strong></div><div><span>Infiltrated into soil</span><strong>${fmt(m.infiltrated,2)} m³</strong></div><div><span>River + sewer outflow</span><strong>${fmt(m.drained,2)} m³</strong></div><div><span>Unaccounted-for residual</span><strong>${m.balance.toExponential(3)} m³</strong></div></div><p>Mass conservation checks bookkeeping. It does not establish real-world predictive accuracy. Read “The science” for the model assumptions.</p>`);}
 function report(){if(!results)return;const b=results.baseline.metrics,d=results.design.metrics,percent=b.peakVolume?100*(1-d.peakVolume/b.peakVolume):0;
   modal(`<div class="eyebrow">RIVERSIDE COMMONS · SCENARIO REPORT</div><h2>Small changes. Measurable possibilities.</h2><div class="report-summary"><strong>${fmt(percent,1)}% less peak surface water.</strong><small>${plan.length} interventions · ${money(costOf(plan))} illustrative investment</small></div><p>Under the same ${config.intensity} mm/h, ${config.duration}-minute storm, your design changes peak water from ${fmt(b.peakVolume)} to ${fmt(d.peakVolume)} m³ and peak flooded area from ${fmt(b.peakArea)} to ${fmt(d.peakArea)} m².</p><p>This is a synthetic teaching scenario. Parameters and costs are illustrative, and the model is not calibrated to a real site.</p><button class="button primary" id="csvBtn">Download full time series ↓</button> <button class="button outline" id="reportPlanBtn">Export reproducible plan ↓</button><br><button class="button outline" id="coverBtn">Export visual report ↓</button> <button class="button outline" id="videoBtn">Record narrated demo ↓</button><p id="videoProgress" style="margin-top:15px"></p>`);
   $('csvBtn').onclick=()=>{const rows=['minute,rainfall_input_m3,baseline_surface_m3,design_surface_m3,design_flooded_area_m2,infiltrated_m3,stored_m3,outflow_m3'];results.design.series.forEach((p,i)=>rows.push([p.minute,p.rain,results.baseline.series[i].surface,p.surface,p.area,p.infiltrated,p.storage,p.drained].join(',')));download('pluvia-storm-timeseries.csv',rows.join('\n'),'text/csv');};$('reportPlanBtn').onclick=exportPlan;
-  const state=()=>({map:canvas,graph:chart,results,plan,config,cost:costOf(plan)});
+  const state=()=>({map:cameraMode==='3d'&&city3d?$('city3dCanvas'):canvas,graph:chart,results,plan,config,cost:costOf(plan)});
   $('coverBtn').onclick=()=>{drawMap();drawChart();exportCover(state());};
-  $('videoBtn').onclick=async()=>{if(busy)return;const saved={minute,showRoute,zoom};playing=false;zoom=1;$('videoBtn').disabled=true;$('videoProgress').textContent='Preparing the synthetic narration…';
-    try{const result=await recordDemo(state(),s=>{minute=s.minute;presentationBaseline=s.baseline;showRoute=s.route;drawMap();drawChart();},p=>{if($('videoProgress'))$('videoProgress').textContent=`Recording ${Math.round(p.elapsed)} / ${Math.round(p.duration)} seconds. Keep this tab visible until the download starts.`;});toast(`Demo exported: ${Math.round(result.duration)} seconds, ${fmt(result.bytes/1000000,1)} MB.`);}
-    catch(e){toast(e.message);}finally{minute=saved.minute;showRoute=saved.showRoute;zoom=saved.zoom;presentationBaseline=false;update();if($('videoBtn'))$('videoBtn').disabled=false;if($('videoProgress'))$('videoProgress').textContent='Recording finished. The demo is in your downloads.';}
+  $('videoBtn').onclick=async()=>{if(busy)return;const saved={minute,showRoute,zoom,autoOrbit};recording=true;setBusy(true,'Recording your walkthrough…');playing=false;zoom=1;if(city3d&&cameraMode==='3d'){city3d.reset();city3d.setAutoRotate(true);}document.querySelector('.modal-close').disabled=true;$('videoBtn').disabled=true;$('videoProgress').textContent='Preparing the synthetic narration…';
+    try{const result=await recordDemo(state(),s=>{minute=s.minute;presentationBaseline=s.baseline;showRoute=s.route;drawMap(performance.now());drawChart();},p=>{if($('videoProgress'))$('videoProgress').textContent=`Recording ${Math.round(p.elapsed)} / ${Math.round(p.duration)} seconds. Keep this tab visible until the download starts.`;});toast(`Demo exported: ${Math.round(result.duration)} seconds, ${fmt(result.bytes/1000000,1)} MB.`);}
+    catch(e){toast(e.message);}finally{recording=false;setBusy(false);document.querySelector('.modal-close').disabled=false;minute=saved.minute;showRoute=saved.showRoute;zoom=saved.zoom;autoOrbit=saved.autoOrbit;city3d?.setAutoRotate(autoOrbit);presentationBaseline=false;update();if($('videoBtn'))$('videoBtn').disabled=false;if($('videoProgress'))$('videoProgress').textContent='Recording finished. The demo is in your downloads.';}
   };
 }
 async function stressTest(){
@@ -188,7 +193,7 @@ $('scenario').onchange=e=>{scenario=e.target.value;if(SCENARIOS[scenario]){confi
 $('rainfall').oninput=e=>{$('rainValue').textContent=e.target.value;};$('rainfall').onchange=e=>{config.intensity=+e.target.value;scenario='custom';$('scenario').value=scenario;frontier=[];run();};
 $('duration').onchange=e=>{config.duration=+e.target.value;scenario='custom';$('scenario').value=scenario;frontier=[];run();};$('soil').onchange=e=>{config.soilFactor=+e.target.value;frontier=[];run();};
 $('budget').oninput=e=>{const value=+e.target.value;if(value<costOf(plan)){e.target.value=budget;return;}budget=value;updateBudget();storage.set(snapshot());};
-$('optimizeBtn').onclick=()=>{if(busy)return;setBusy(true,'A better plan starts with a question.','Testing where each dollar makes the most difference.');worker.postMessage(payload('optimize'));};
+$('optimizeBtn').onclick=()=>{if(busy)return;setBusy(true,'A better plan starts with a question.','Testing where each dollar makes the most difference.');const message=payload('optimize');mainJob=message.jobId;worker.postMessage(message);};
 $('runBtn').onclick=run;$('stressBtn').onclick=stressTest;$('undoBtn').onclick=()=>{if(!history.length)return toast('Nothing to undo yet.');plan=history.pop();frontier=[];run();};$('eraseBtn').onclick=()=>chooseTool('erase');
 $('exampleBtn').onclick=async()=>{if(busy)return;try{restore(await (await fetch('./example-plan.json')).json());frontier=[];run();toast('Loaded the Riverside retrofit: a measured, reproducible example plan.');}catch(e){toast(e.message);}};
 $('clearBtn').onclick=()=>{if(!plan.length)return;history.push([...plan]);plan=[];frontier=[];run();};
@@ -198,21 +203,30 @@ $('playBtn').onclick=()=>{if(busy)return;playing=!playing;if(playing&&minute>=co
 $('speedBtn').onclick=()=>{speed=speed===1?2:speed===2?4:1;$('speedBtn').textContent=speed+'×';};
 function toggleRoute(){showRoute=!showRoute;$('routeBtn').classList.toggle('active',showRoute);$('showRouteBtn').textContent=showRoute?'Hide ↗':'Show ↗';dirty=true;}
 $('routeBtn').onclick=toggleRoute;$('showRouteBtn').onclick=toggleRoute;
-$('zoomIn').onclick=()=>{zoom=clamp(zoom*1.15,.6,2);dirty=true;};$('zoomOut').onclick=()=>{zoom=clamp(zoom/1.15,.6,2);dirty=true;};$('resetView').onclick=()=>{zoom=1;selected=-1;hover=-1;$('inspector').hidden=true;dirty=true;};
+$('zoomIn').onclick=()=>{if(cameraMode==='3d'&&city3d){city3d.zoomBy(1.15);return;}zoom=clamp(zoom*1.15,.6,2);dirty=true;};$('zoomOut').onclick=()=>{if(cameraMode==='3d'&&city3d){city3d.zoomBy(1/1.15);return;}zoom=clamp(zoom/1.15,.6,2);dirty=true;};$('resetView').onclick=()=>{city3d?.reset();zoom=1;selected=-1;hover=-1;$('inspector').hidden=true;dirty=true;};
 canvas.addEventListener('pointermove',e=>{hover=hit(e);dirty=true;});canvas.addEventListener('pointerleave',()=>{hover=-1;dirty=true;});canvas.addEventListener('click',e=>editAt(hit(e)));
 canvas.addEventListener('wheel',e=>{e.preventDefault();zoom=clamp(zoom*(e.deltaY>0?.95:1.05),.6,2);dirty=true;},{passive:false});
-canvas.addEventListener('keydown',e=>{let i=selected>=0?selected:12*W+13;if(e.key==='ArrowRight')i=clamp(i+1,0,N-1);else if(e.key==='ArrowLeft')i=clamp(i-1,0,N-1);else if(e.key==='ArrowDown')i=clamp(i+W,0,N-1);else if(e.key==='ArrowUp')i=clamp(i-W,0,N-1);else if(e.key==='Enter'){e.preventDefault();editAt(i);return;}else return;e.preventDefault();selected=i;hover=-1;showInspector(i);dirty=true;});
+for(const keyboardCanvas of [canvas,$('city3dCanvas')])keyboardCanvas.addEventListener('keydown',e=>{let i=selected>=0?selected:12*W+13;if(e.key==='ArrowRight')i=clamp(i+1,0,N-1);else if(e.key==='ArrowLeft')i=clamp(i-1,0,N-1);else if(e.key==='ArrowDown')i=clamp(i+W,0,N-1);else if(e.key==='ArrowUp')i=clamp(i-W,0,N-1);else if(e.key==='Enter'){e.preventDefault();editAt(i);return;}else return;e.preventDefault();selected=i;hover=-1;showInspector(i);dirty=true;});
 document.addEventListener('keydown',e=>{if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName)||$('modal').open)return;const keys=['inspect','garden','pavement','basin','erase'];if(+e.key>=1&&+e.key<=5)chooseTool(keys[+e.key-1]);if(e.key==='Escape'){chooseTool('inspect');selected=-1;$('inspector').hidden=true;dirty=true;}if(e.code==='Space'){e.preventDefault();$('playBtn').click();}});
 $('balanceBtn').onclick=ledger;$('reportBtn').onclick=report;$('tourBtn').onclick=tour;$('footerMethod').onclick=()=>switchView('method');$('saveBtn').onclick=exportPlan;
-$('importBtn').onclick=()=>$('importFile').click();$('importFile').onchange=async e=>{try{if(!e.target.files[0])return;const text=await e.target.files[0].text();if(text.length>200000)throw Error('Please choose a PLUVIA plan smaller than 200 KB.');restore(JSON.parse(text));frontier=[];run();toast('Plan imported. Reproducing the paired simulations.');}catch(error){toast(error.message);}e.target.value='';};
-$('elevationBtn').onclick=()=>$('elevationFile').click();$('elevationFile').onchange=async e=>{try{if(!e.target.files[0])return;const text=await e.target.files[0].text();if(text.length>100000)throw Error('The elevation file is too large.');const rows=text.trim().split(/\r?\n/);if(rows.length!==H)throw Error('Expected 40 rows of elevation values.');const values=[];for(const row of rows){const cells=row.split(',');if(cells.length!==W)throw Error('Each elevation row must contain exactly 48 columns.');for(const cell of cells){if(!cell.trim()||!Number.isFinite(+cell)||Math.abs(+cell)>10000)throw Error('Elevations must be finite numbers between −10,000 and 10,000 m.');values.push(+cell);}}elevation=values;city.z.set(values);frontier=[];$('elevationStatus').textContent='Custom elevation loaded · 1,920 cells';switchView('design');run();toast('Custom elevations loaded. The synthetic land cover is preserved.');}catch(error){toast(error.message);}e.target.value='';};
+$('importBtn').onclick=()=>$('importFile').click();$('importFile').onchange=async e=>{try{if(busy||!e.target.files[0])return;const text=await e.target.files[0].text();if(text.length>200000)throw Error('Please choose a PLUVIA plan smaller than 200 KB.');restore(JSON.parse(text));frontier=[];run();toast('Plan imported. Reproducing the paired simulations.');}catch(error){toast(error.message);}e.target.value='';};
+$('elevationBtn').onclick=()=>$('elevationFile').click();$('elevationFile').onchange=async e=>{try{if(busy||!e.target.files[0])return;const text=await e.target.files[0].text();if(text.length>100000)throw Error('The elevation file is too large.');const rows=text.trim().split(/\r?\n/);if(rows.length!==H)throw Error('Expected 40 rows of elevation values.');const values=[];for(const row of rows){const cells=row.split(',');if(cells.length!==W)throw Error('Each elevation row must contain exactly 48 columns.');for(const cell of cells){if(!cell.trim()||!Number.isFinite(+cell)||Math.abs(+cell)>10000)throw Error('Elevations must be finite numbers between −10,000 and 10,000 m.');values.push(+cell);}}elevation=values;city.z.set(values);frontier=[];$('elevationStatus').textContent='Custom elevation loaded · 1,920 cells';switchView('design');run();toast('Custom elevations loaded. The synthetic land cover is preserved.');}catch(error){toast(error.message);}e.target.value='';};
 $('shareBtn').onclick=async()=>{const share={...snapshot(),elevation:null};if(elevation){toast('Custom elevation plans are shared by file. Export the plan to include your elevation grid.');exportPlan();return;}const encoded=btoa(JSON.stringify(share)),url=location.origin+location.pathname+'#plan='+encodeURIComponent(encoded);try{await navigator.clipboard.writeText(url);toast('Scenario link copied. Anyone with the app can reproduce this plan.');}catch{modal(`<div class="eyebrow">REPRODUCIBLE BY DESIGN</div><h2>Pass the possibilities on.</h2><p>Copy this link to share the terrain, storm settings and intervention plan.</p><input class="copy-field" id="shareField" readonly value="${esc(url)}">`);$('shareField').select();}};
-document.querySelector('.modal-close').onclick=()=>$('modal').close();$('modal').addEventListener('click',e=>{if(e.target===$('modal')){const r=$('modal').getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)$('modal').close();}});
+$('modal').addEventListener('cancel',e=>{if(recording)e.preventDefault();});document.querySelector('.modal-close').onclick=()=>{if(!recording)$('modal').close();};$('modal').addEventListener('click',e=>{if(!recording&&e.target===$('modal')){const r=$('modal').getBoundingClientRect();if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)$('modal').close();}});
 function animate(now){
   if(playing&&!busy&&results){if(!lastTick)lastTick=now;if(now-lastTick>250/speed){minute=Math.min(config.duration,minute+1);lastTick=now;update();if(minute>=config.duration){playing=false;$('playBtn').textContent='▶';}}}
-  if((dirty||playing||(showRoute&&!reducedMotion))&&now-lastDraw>32&&!$('designView').hidden){drawMap(now);lastDraw=now;}
+  if((dirty||playing||(cameraMode==='3d'&&autoOrbit)||(showRoute&&!reducedMotion))&&now-lastDraw>32&&!$('designView').hidden){drawMap(now);lastDraw=now;}
   requestAnimationFrame(animate);
 }
 // Restore only validated, bounded data. Shared URL state takes precedence.
 try{if(location.hash.startsWith('#plan=')){const encoded=decodeURIComponent(location.hash.slice(6));if(encoded.length>100000)throw Error('The shared scenario is too large.');restore(JSON.parse(atob(encoded)));toast('Shared scenario loaded. Running a reproducible comparison.');}else{const saved=storage.get();if(saved)restore(saved);}}catch(e){toast('Could not restore the plan: '+e.message);}
 makeWorker();new ResizeObserver(resize).observe($('stage'));resize();updateBudget();run();requestAnimationFrame(animate);
+
+async function init3D(){
+  try{const {City3D}=await import('./city3d.js');city3d=new City3D($('city3dCanvas'),i=>editAt(i),i=>{hover=i;dirty=true;},()=>{dirty=true;if(selected>=0&&cameraMode==='3d')showInspector(selected);});city3d.setCity(city);setCameraMode('3d');}
+  catch(e){console.warn('3D renderer unavailable',e);$('sceneBtn').textContent='2D';$('sceneBtn').classList.remove('active');$('orbitBtn').disabled=true;}
+}
+function setCameraMode(mode){if(recording)return;cameraMode=mode;$('city3dCanvas').hidden=mode!=='3d';canvas.hidden=mode==='3d';$('sceneBtn').textContent=mode==='3d'?'3D':'2D';$('sceneBtn').classList.toggle('active',mode==='3d');$('orbitBtn').hidden=mode!=='3d';chooseTool(tool);resize();dirty=true;}
+$('sceneBtn').onclick=()=>{if(city3d)setCameraMode(cameraMode==='3d'?'2d':'3d');};
+$('orbitBtn').onclick=()=>{autoOrbit=!autoOrbit;city3d?.setAutoRotate(autoOrbit);$('orbitBtn').classList.toggle('active',autoOrbit);dirty=true;};
+init3D();

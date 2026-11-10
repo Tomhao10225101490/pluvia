@@ -12,7 +12,7 @@ PLUVIA makes a synthetic neighborhood into a hands-on experiment. The point is n
 
 ## What it does
 
-Choose a storm, adjust its duration and soil condition, then watch water move over terrain in a custom isometric city. Place rain gardens, permeable paving and retention basins with real effects inside the model. Every intervention has compatible land cover, finite storage, infiltration behavior and an illustrative cost.
+Choose a storm, adjust its duration and soil condition, then watch water move over terrain in a real three-dimensional WebGL city. Orbit volumetric buildings, pan across the neighborhood and zoom into interventions; shadows and raycast tile picking make the scene spatially explorable. A Canvas 2D plan and fallback remain available. Place rain gardens, permeable paving and retention basins with real effects inside the model. Every intervention has compatible land cover, finite storage, infiltration behavior and an illustrative cost.
 
 Every design is compared with a paired baseline using identical terrain and rainfall. Scrub the hydrograph, inspect water depth tile by tile, and see whether the model's school-to-community-center route remains available. A* excludes building and river cells and blocks water deeper than 15 cm.
 
@@ -22,7 +22,7 @@ Open the water ledger to account for every modeled drop. Export a reproducible J
 
 ## How we built it
 
-PLUVIA is a static application with no runtime JavaScript dependencies or backend requirements. ES modules separate the numerical engine, Web Worker computation, interaction, renderer and media export. Canvas 2D draws the city, vegetation, water overlays and hydrograph from original geometry.
+PLUVIA is a static application with no backend requirement. Its numerical engine is dependency-free; Three.js 0.187.0 and OrbitControls are bundled locally for the WebGL renderer. ES modules separate the numerical engine, Web Worker computation, interaction, renderer and media export. Original geometric buildings, vegetation, interventions and water surfaces share the same live model frames. Canvas 2D supplies the alternate city plan and hydrograph.
 
 The model uses a 48 × 40 grid of 8 m cells with a 10-second time step. Rainfall reaches all cells; roof runoff is redirected to ground. A land-cover-dependent infiltration term and finite intervention storage compete with surface runoff. Sewer inlets and a free-draining river are explicit, tracked sinks. Pairwise finite-volume face exchange uses water-surface elevation and a Manning-inspired discharge law. A head-difference cap and donor limiting avoid negative water and alternating-cell numerical artifacts.
 
@@ -50,15 +50,15 @@ Calibrated real-world catchments, observed rainfall and surveyed terrain; a subs
 
 ## Model limits and credits
 
-PLUVIA is an educational prototype, not a calibrated flood forecast, engineering design tool or real-world navigation service. The neighborhood, elevations, costs and hydrological parameters are illustrative. The outer boundary is closed, the river drains freely, and subsurface networks and backwater are not modeled.
+PLUVIA is an educational prototype, not a calibrated flood forecast, engineering design tool or real-world navigation service. The neighborhood, elevations, costs and hydrological parameters are illustrative. The outer boundary is closed, the river drains freely, and subsurface networks and backwater are not modeled. Terrain relief and water height are visually enhanced for legibility; this is not a survey-scale reconstruction. The solver and exported values retain the original model units.
 
-Conceptual hydrology reference: US EPA SWMM documentation, https://www.epa.gov/water-research/storm-water-management-model-swmm. PLUVIA uses an independently authored simplified engine, not SWMM. Typography: DM Sans and DM Serif Display (Google Fonts, SIL Open Font License). All city graphics are code-drawn geometry. Comparative research included the public description of HydroGrid from a different hackathon; its code and assets were not reused.
+Conceptual hydrology reference: US EPA SWMM documentation, https://www.epa.gov/water-research/storm-water-management-model-swmm. PLUVIA uses an independently authored simplified engine, not SWMM. 3D rendering: Three.js 0.187.0 and OrbitControls, MIT licensed, bundled in `dist/vendor/` with `LICENSE-three.txt`. Typography: DM Sans and DM Serif Display (Google Fonts, SIL Open Font License). All city graphics are code-drawn geometry. Comparative research included the public description of HydroGrid from a different hackathon; its code and assets were not reused.
 
 **AI disclosure:** OpenAI Codex was used extensively for ideation, architecture, visual design, numerical code, tests, documentation and submission preparation. Significant portions of the code and writing were AI-generated. There is no runtime AI model; optimization is deterministic numerical search. Demo narration is synthetic text-to-speech. Participants are responsible for understanding, verifying and demonstrating their submission.
 
 ## Built with
 
-JavaScript, HTML, CSS, Canvas 2D, Web Workers, MediaRecorder, Web Audio API, finite-volume modeling, A* search, simulation-based optimization, Node.js tests, OpenAI Codex.
+JavaScript, HTML, CSS, Three.js 0.187.0, WebGL, OrbitControls, Canvas 2D, Web Workers, MediaRecorder, Web Audio API, finite-volume modeling, A* search, simulation-based optimization, Node.js tests, OpenAI Codex.
 
 ## Tracks
 

@@ -1,8 +1,8 @@
 What if a neighborhood could make room for the rain?
 
-Meet Pluvia, an interactive urban resilience lab built for IceHacks. We wanted to turn an invisible infrastructure problem into something people can explore, question, and redesign.
+Meet Pluvia, an urban resilience lab built for IceHacks. We turn invisible infrastructure into something people can explore, question, and redesign.
 
-This is Riverside Commons, a synthetic neighborhood with streets, buildings, parks, terrain, and a river. Choose a storm and watch water move across the city. A paired baseline gives every design a fair comparison: the same city, under exactly the same rain.
+This is Riverside Commons in real three-dimensional WebGL. Orbit the buildings, pan across parks, and zoom into the water. Choose a storm; a paired baseline gives every design a fair comparison: the same terrain, under exactly the same rain.
 
 Now add a rain garden, permeable paving, or a retention basin. Each intervention changes infiltration or finite storage, and each has an illustrative cost. The numbers on screen are calculated from the simulation.
 
@@ -14,6 +14,6 @@ Underneath, a conservative grid model tracks rainfall, surface water, storage, i
 
 Export a plan, share a reproducible scenario, download the full time series, or test the same design against three different storms.
 
-Pluvia is an educational prototype, not a calibrated forecast. Its data and costs are illustrative. Development was extensively assisted by OpenAI Codex. This narration is synthetic.
+Pluvia is an educational prototype, not a calibrated forecast. Its visual relief is enhanced; data and costs are illustrative. Development was extensively assisted by OpenAI Codex. This narration is synthetic.
 
 Little interventions. Lasting possibilities. Pluvia.

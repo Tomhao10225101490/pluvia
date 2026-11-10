@@ -2,7 +2,7 @@
 // No screen/microphone capture, remote recording service, or fabricated telemetry.
 const f=(v,d=0)=>Number(v).toLocaleString('en-US',{maximumFractionDigits:d});
 const C={paper:'#f5f4ee',ink:'#263e37',green:'#297963',muted:'#7a8970',line:'#d8dfce'};
-function fit(ctx,source,x,y,w,h){const r=Math.min(w/source.width,h/source.height),dw=source.width*r,dh=source.height*r;ctx.drawImage(source,x+(w-dw)/2,y+(h-dh)/2,dw,dh);}
+function fit(ctx,source,x,y,w,h){if(!source.width||!source.height)throw Error('Keep the design view visible while exporting.');const r=Math.min(w/source.width,h/source.height),dw=source.width*r,dh=source.height*r;ctx.drawImage(source,x+(w-dw)/2,y+(h-dh)/2,dw,dh);}
 function wrap(ctx,text,x,y,max,line){const words=text.split(' ');let row='';for(const word of words){const test=row+word+' ';if(ctx.measureText(test).width>max&&row){ctx.fillText(row.trim(),x,y);row=word+' ';y+=line;}else row=test;}ctx.fillText(row.trim(),x,y);return y+line;}
 function save(blob,name){const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),10000);}
 export function drawCover({map,graph,results,plan,config,cost},out=document.createElement('canvas')){
@@ -42,9 +42,15 @@ export async function recordDemo(state,frame,onProgress){
     [.94,'BUILT FOR ICEHACKS 2026','Little interventions. Lasting possibilities.','Synthetic data · Educational model · Extensively assisted by OpenAI Codex']
   ];
   await new Promise((resolve,reject)=>{
-    recorder.onerror=e=>reject(e.error||Error('Recording failed.'));
-    recorder.onstop=()=>resolve();
+    let stopped=false, timer;
+    const cleanup=()=>{stopped=true;clearTimeout(timer);try{voice.stop();}catch{}stream.getTracks().forEach(t=>t.stop());};
+    const stop=()=>{if(stopped)return;stopped=true;if(recorder.state!=='inactive')recorder.stop();else{cleanup();resolve();}};
+    recorder.onerror=e=>{cleanup();reject(e.error||Error('Recording failed.'));};
+    recorder.onstop=()=>{cleanup();resolve();};
+    timer=setTimeout(stop,Math.ceil(duration*1000));
     const tick=now=>{
+      if(stopped)return;
+      try{
       const elapsed=(now-start)/1000,p=Math.min(elapsed/duration,1),s=[...scenes].reverse().find(s=>p>=s[0])??scenes[0];
       const baseline=p>=.14&&p<.29,local=baseline?(p-.14)/.15:p>=.29&&p<.43?(p-.29)/.14:p>=.59&&p<.71?(p-.59)/.12:.67;
       frame({minute:Math.min(state.config.duration,Math.round(local*state.config.duration)),baseline,route:p>=.59&&p<.71});
@@ -54,8 +60,9 @@ export async function recordDemo(state,frame,onProgress){
       c.textAlign='right';c.fillStyle=C.green;c.fillText('pluvia · '+(baseline?'BASELINE CITY':'YOUR DESIGN'),1538,878);c.textAlign='left';
       c.fillStyle='#d8dfce';c.fillRect(0,896,1600,4);c.fillStyle=C.green;c.fillRect(0,896,1600*p,4);
       onProgress({elapsed,duration});
-      if(elapsed>=duration){recorder.stop();voice.stop();stream.getTracks().forEach(t=>t.stop());return;}
+      if(elapsed>=duration){stop();return;}
       requestAnimationFrame(tick);
+      }catch(e){cleanup();if(recorder.state!=='inactive')recorder.stop();reject(e);}
     };requestAnimationFrame(tick);
   });
   await audioCtx.close();const blob=new Blob(chunks,{type:mime});save(blob,'pluvia-icehacks-demo.webm');return {duration,bytes:blob.size};
